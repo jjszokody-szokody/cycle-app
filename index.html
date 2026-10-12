@@ -1,11 +1,11 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cycle – Motorcycle Routes</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css"></head><body>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"><link rel="stylesheet" href="style.css"></head><body>
 <div id="map"></div>
 <div id="panel">
  <h1>🏍️ Cycle</h1>
- <div class="field"><input id="from" placeholder="Start (e.g. Duluth, GA)" autocomplete="off"><button id="gps" title="Use my location">◎</button></div>
+ <div class="field"><input id="from" placeholder="Start (blank = my location)" autocomplete="off"><button id="gps" title="Use my location">◎</button></div>
  <div class="sugg" id="from-s"></div>
  <div class="field"><input id="to" placeholder="Destination" autocomplete="off"></div>
  <div class="sugg" id="to-s"></div>
@@ -21,7 +21,7 @@
  <div id="summary"></div>
  <ol id="steps"></ol>
 </div>
-<div id="nav" hidden><div id="navtop"><div id="navicon">⬆</div><div><div id="navdist">–</div><div id="navinstr">Starting…</div><div id="navthen"></div></div></div>
+<div id="nav" hidden><div id="navmap"></div><button id="navview">🧭 North Up</button><div id="navtop"><div id="navicon">⬆</div><div><div id="navdist">–</div><div id="navinstr">Starting…</div><div id="navthen"></div></div></div>
 <div id="navbot"><div><b id="navrem">–</b><small>remaining</small></div><div><b id="naveta">–</b><small>ETA</small></div><div><b id="navspd">–</b><small>mph</small></div><button id="navmute">🔊</button><button id="navend">End</button></div><div id="navmsg"></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="routing.js"></script><script src="app.js"></script><script src="nav.js"></script></body></html>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script><script src="routing.js"></script><script src="app.js"></script><script src="nav.js"></script></body></html>

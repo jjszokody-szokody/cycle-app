@@ -23,3 +23,6 @@ body.navigating #panel{display:none}
 #navbot button{font-size:18px;padding:10px 14px;border-radius:10px;border:1px solid #ccc;background:#fff}#navend{background:#d93025!important;color:#fff;border:0!important;font-weight:700}
 #navmsg{position:fixed;z-index:1100;bottom:80px;left:50%;transform:translateX(-50%);background:#202124e0;color:#fff;padding:8px 14px;border-radius:18px;font-size:14px;display:none}
 .rider{width:34px;height:34px}.rider div{width:34px;height:34px;transition:transform .4s}
+#navmap{position:fixed;inset:0;z-index:1050;background:#eee}
+#navview{position:fixed;z-index:1100;right:12px;top:130px;padding:10px 12px;border-radius:20px;border:0;background:#fff;box-shadow:0 2px 8px #0005;font-weight:600;font-size:14px}
+.rider2{width:40px;height:40px}

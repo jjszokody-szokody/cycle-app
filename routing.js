@@ -24,9 +24,10 @@ function cacheCover(bb){cacheGet('__init');const keys=new Set([...Object.keys(me
  for(const k of keys){const b=k.split(',').map(Number);if(b.length===4&&b[0]<=bb[0]&&b[1]<=bb[1]&&b[2]>=bb[2]&&b[3]>=bb[3])return cacheGet(k)}return null}
 async function scenery(bb,log=()=>{}){const k=bb.join(',');const c=cacheCover(bb);if(c){log('Scenery: cached');return c}
  const B=`(${bb.join(',')})`;const q=`[out:json][timeout:60];(way["natural"="water"]["name"]${B};relation["natural"="water"]${B};way["water"~"^(lake|reservoir|river)$"]${B};way["waterway"="river"]${B};way["natural"="coastline"]${B};way["leisure"="nature_reserve"]${B};relation["leisure"="nature_reserve"]${B};way["leisure"="park"]["name"]${B};relation["leisure"="park"]${B};relation["boundary"~"^(national_park|protected_area)$"]${B};way["boundary"~"^(national_park|protected_area)$"]${B};relation["landuse"="forest"]["name"]${B};);out tags geom(${bb.join(',')}) qt;`;
- let lastErr;for(const m of MIRRORS){try{log('Scenery: querying '+new URL(m).host+'…');const r=await fetchT(m,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)},75000);
-  if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();const out=parseScenery(j);out.src=new URL(m).host;cacheSet(k,out);return out}catch(e){lastErr=e}}
- throw Error('Overpass unavailable ('+(lastErr&&lastErr.message)+')')}
+ log('Scenery: querying '+MIRRORS.length+' Overpass mirrors in parallel…');const ctrls=MIRRORS.map(()=>new AbortController());
+ try{const out=await Promise.any(MIRRORS.map(async(m,ix)=>{const t=setTimeout(()=>ctrls[ix].abort(),30000);try{const r=await fetch(m,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q),signal:ctrls[ix].signal});
+   if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();const o=parseScenery(j);o.src=new URL(m).host;return o}finally{clearTimeout(t)}}));
+  ctrls.forEach(c=>c.abort());cacheSet(k,out);return out}catch(e){throw Error('Overpass unavailable ('+((e.errors||[]).map(x=>x.message).join(', ')||e.message)+')')}}
 function parseScenery(j){const water=[],park=[];const q=x=>Math.round(x*1e5)/1e5;
  const segs=(g,arr)=>{if(!g)return;for(let i=1;i<g.length;i++)if(g[i-1]&&g[i])arr.push([q(g[i-1].lat),q(g[i-1].lon),q(g[i].lat),q(g[i].lon)])};
  for(const e of j.elements||[]){const t=e.tags||{};const isW=t.natural==='water'||t.waterway||t.natural==='coastline'||t.water;const arr=isW?water:park;
@@ -50,7 +51,15 @@ function prepScenery(sc){if(sc._prep)return sc._prep;const W=grid(sc.water);cons
 function sceneryStats(pts,sc,waterKm=0.4,parkKm=0.3){const {W,P,boxes}=prepScenery(sc);const samp=[pts[0]];let acc=0;for(let i=1;i<pts.length;i++){acc+=dist(pts[i-1],pts[i]);if(acc>=0.2){samp.push(pts[i]);acc=0}}
  let w=0,pk=0;for(const p of samp){if(near(W,p,waterKm))w++;let inP=near(P,p,parkKm);if(!inP)for(let j=0;j<boxes.length&&!inP;j++){const b=boxes[j];if(p[0]>=b[0]&&p[0]<=b[2]&&p[1]>=b[1]&&p[1]<=b[3]&&inside(sc.parks[j],p))inP=true}if(inP)pk++}
  return{water:w/samp.length,park:pk/samp.length,n:samp.length}}
-async function post(path,body){const r=await fetch(VAL+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
+const RC={};let active=0;const queue=[];
+function slot(){return new Promise(r=>{if(active<3){active++;r()}else queue.push(r)})}function release(){const n=queue.shift();if(n)n();else active--}
+function rcGet(k){if(RC[k])return RC[k];try{const v=typeof localStorage!=='undefined'&&localStorage.getItem('vrc:'+k);if(v)return RC[k]=JSON.parse(v)}catch(e){}return null}
+function rcSet(k,v){RC[k]=v;try{if(typeof localStorage!=='undefined'){const s=JSON.stringify(v);if(s.length<1.5e6)localStorage.setItem('vrc:'+k,s)}}catch(e){try{for(let i=localStorage.length-1;i>=0;i--){const x=localStorage.key(i);if(x&&x.startsWith('vrc:'))localStorage.removeItem(x)}}catch(_){}}}
+function hash(str){let h=5381;for(let i=0;i<str.length;i++)h=(h*33^str.charCodeAt(i))>>>0;return h.toString(36)+str.length}
+async function post(path,body){const key=hash(path+JSON.stringify(body));const c=rcGet(key);if(c)return c;let err;
+ for(let a=0;a<4;a++){await slot();let r,j;try{r=await fetch(VAL+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});j=await r.json().catch(()=>({}))}catch(e){err=e}finally{release()}
+  if(r&&r.ok){rcSet(key,j);return j}if(r&&r.status<500&&r.status!==429)throw new Error(j.error||r.status);err=err||Error(r?'HTTP '+r.status:'network');await new Promise(z=>setTimeout(z,600*2**a))}throw err}
+async function post_unused(path,body){const r=await fetch(VAL+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);return j}
 function costing(mode){const o={use_trails:0.0,exclude_unpaved:true,use_tolls:0.5};
  if(mode!=='fast'){o.use_highways=0.0;o.use_primary=mode==='curvy'?0.1:0.3;o.use_living_streets=0.1}else{o.use_highways=1.0}return{motorcycle:o}}
 async function route(locs,mode,alts){const b={locations:locs.map(p=>({lat:p[0],lon:p[1],type:'break'})),costing:'motorcycle',costing_options:costing(mode),directions_options:{units:'miles'}};
@@ -69,15 +78,21 @@ function score(info,a,mode,baseMin){const c=info.curv.degPerKm;const detour=Math
 // Via-point variations: offsets perpendicular to the straight line
 function vias(A,B){const m=[(A[0]+B[0])/2,(A[1]+B[1])/2],dx=B[1]-A[1],dy=B[0]-A[0],out=[];
  for(const [t,k] of [[0.5,0.15],[0.5,-0.15],[0.5,0.3],[0.5,-0.3],[0.33,0.2],[0.66,-0.2]]){const p=[A[0]+dy*t,A[1]+dx*t];out.push([p[0]+dx*k,p[1]-dy*k])}return out}
-async function plan(A,B,mode,log=()=>{}){
- if(mode==='fast'){const [t]=await route([A,B],'fast',0);const i=tripInfo(t);i.curv=curvature(i.pts);return{best:i,cands:[i]}}
- log('Fetching base routes…');const trips=await route([A,B],mode,2);
- const vs=vias(A,B);log('Trying '+vs.length+' via-point variations…');
- const res=await Promise.allSettled(vs.map(v=>route([A,v,B],mode,0)));res.forEach(r=>r.status==='fulfilled'&&trips.push(r.value[0]));
- const cands=trips.map(tripInfo);cands.forEach((c,i)=>{c.trip=trips[i];c.curv=curvature(c.pts)});
- const baseMin=Math.min(...cands.map(c=>c.min));log('Scoring '+cands.length+' candidates (road class + surface)…');
- for(const c of cands){for(let k=0;k<3&&!c.attrs;k++){try{c.attrs=await attrs(c.trip)}catch(e){await new Promise(r=>setTimeout(r,800*(k+1)))}}c.attrs=c.attrs||{tot:0,unpavedFrac:0,motorway:0,primary:0,sec:0,minor:0,err:1}}
- if(mode==='scenic'){try{const sc=await scenery(bboxOf(cands),log);cands.forEach(c=>c.nature=sceneryStats(c.pts,sc));cands.sceneSrc=sc.src||'cache'}catch(e){log('Scenery unavailable: '+e.message);cands.sceneErr=e.message}}
- cands.forEach(c=>c.score=score(c,c.attrs,mode,baseMin));cands.sort((a,b)=>b.score.total-a.score.total);return{best:cands[0],cands,sceneErr:cands.sceneErr}}
+const ZA={tot:0,unpavedFrac:0,motorway:0,primary:0,sec:0,minor:0};
+async function plan(A,B,mode,log=()=>{},onUpdate=()=>{}){
+ if(mode==='fast'){const [t]=await route([A,B],'fast',0);const i=tripInfo(t);i.curv=curvature(i.pts);onUpdate({best:i,cands:[i]});return{best:i,cands:[i]}}
+ const cands=[];let baseMin=Infinity,sc=null;const add=t=>{const c=tripInfo(t);c.trip=t;c.curv=curvature(c.pts);c.attrs=null;cands.push(c);baseMin=Math.min(baseMin,c.min);return c};
+ const rescore=()=>{cands.forEach(c=>{if(sc)c.nature=sceneryStats(c.pts,sc);c.score=score(c,c.attrs||ZA,mode,baseMin)});cands.sort((a,b)=>(b.attrs?1:0)-(a.attrs?1:0)||b.score.total-a.score.total);return{best:cands[0],cands,sceneErr:cands.sceneErr}};
+ log('Fetching routes…');
+ const basePromise=route([A,B],mode,2).then(ts=>{ts.forEach(add);onUpdate({...rescore(),partial:true})});
+ const viaPromise=Promise.allSettled(vias(A,B).map(v=>route([A,v,B],mode,0).then(([t])=>add(t))));
+ await basePromise;await viaPromise;log('Scoring '+cands.length+' candidates…');
+ // scenery in background (only needed for scenic), starts once geometry is known
+ let sceneP=null;if(mode==='scenic')sceneP=scenery(bboxOf(cands),log).then(x=>{sc=x;cands.sceneSrc=x.src}).catch(e=>{cands.sceneErr=e.message;log('Scenery unavailable: '+e.message)});
+ // prefilter: road-class detail (trace_attributes) only for top 5 by curvature/detour
+ const pre=c=>(mode==='curvy'?c.curv.degPerKm:0.5*Math.min(c.curv.degPerKm,80))-Math.max(0,c.min/baseMin-1.6)*60;
+ const top=[...cands].sort((a,b)=>pre(b)-pre(a)).slice(0,5);
+ await Promise.all(top.map(async c=>{try{c.attrs=await attrs(c.trip)}catch(e){c.attrs={...ZA,err:1}}onUpdate({...rescore(),partial:true})}));
+ const res=rescore();res.scenery=sceneP?sceneP.then(()=>rescore()):null;return res}
 G.Cycle={dist,bearing,scenery,sceneryStats,bboxOf,decode,curvature,route,attrs,plan,tripInfo,VAL};if(typeof module!=='undefined')module.exports=G.Cycle;
 })(typeof window!=='undefined'?window:globalThis);
