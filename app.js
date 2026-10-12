@@ -12,12 +12,12 @@ async function geocode(k){if(pts[k])return pts[k];const r=await fetch('https://n
 setupSearch('from');setupSearch('to');
 $('gps').onclick=()=>navigator.geolocation.getCurrentPosition(p=>{$('from').value='My location';setPt('from',[p.coords.latitude,p.coords.longitude])},e=>alert(e.message));
 const st=s=>$('status').textContent=s;
-function show(c,all){layers.clearLayers();(all||[]).forEach(o=>o!==c&&L.polyline(o.pts,{color:'#999',weight:4,opacity:.5}).on('click',()=>show(o,all)).addTo(layers));
+function show(c,all){window.curRoute={c,mode:window.lastMode||'fast',dest:pts.to};$('navbtn').hidden=false;layers.clearLayers();(all||[]).forEach(o=>o!==c&&L.polyline(o.pts,{color:'#999',weight:4,opacity:.5}).on('click',()=>show(o,all)).addTo(layers));
  const line=L.polyline(c.pts,{color:mode==='fast'?'#1a73e8':'#e8711a',weight:6}).addTo(layers);map.fitBounds(line.getBounds(),{padding:[30,30]});
  let h=`<b>${c.miles.toFixed(1)} mi · ${Math.round(c.min)} min</b> · curviness ${c.curv.degPerKm.toFixed(0)}°/km`;
  if(c.score){const a=c.attrs;h+=`<br>Score: <b>${c.score.total}</b> (scenic ${c.score.scenic}, curvy ${c.score.curvy}) · secondary/tertiary ${(a.sec*100|0)}% · motorway ${(a.motorway*100|0)}% · unpaved ${(a.unpavedFrac*100).toFixed(1)}%`+(c.nature?` · 💧 near water ${Math.round(c.nature.water*100)}% · 🌲 park/forest ${Math.round(c.nature.park*100)}%`:'');
   h+=all.map((o,i)=>`<div class="cand ${o===c?'best':''}" data-i="${i}">#${i+1}: ${o.miles.toFixed(1)} mi, ${Math.round(o.min)} min, ${o.curv.degPerKm.toFixed(0)}°/km, score ${o.score.total}${o.nature?` · 💧${Math.round(o.nature.water*100)}% · 🌲${Math.round(o.nature.park*100)}%`:''}</div>`).join('')}
  $('summary').innerHTML=h;$('summary').querySelectorAll('.cand').forEach(d=>d.onclick=()=>show(all[d.dataset.i],all));
  $('steps').innerHTML=c.man.map(m=>`<li>${m.instruction}${m.length?` <small>${m.length.toFixed(1)} mi</small>`:''}</li>`).join('')}
-$('go').onclick=async()=>{closeSugg();try{st('Geocoding…');const A=await geocode('from'),B=await geocode('to');const m=mode==='fast'?'fast':document.querySelector('[name=style]:checked').value;
+$('go').onclick=async()=>{closeSugg();try{st('Geocoding…');const A=await geocode('from'),B=await geocode('to');const m=mode==='fast'?'fast':document.querySelector('[name=style]:checked').value;window.lastMode=m;
  const r=await Cycle.plan(A,B,m,st);show(r.best,m==='fast'?null:r.cands);st(m==='fast'?'Fastest route':`Best ${m==='curvy'?'curvy':'scenic'} route of ${r.cands.length} candidates (paved only)${r.sceneErr?' — scenery data unavailable: '+r.sceneErr:''}. Tap a grey line or list item to compare.`)}catch(e){st('Error: '+e.message)}};

@@ -55,7 +55,7 @@ function costing(mode){const o={use_trails:0.0,exclude_unpaved:true,use_tolls:0.
  if(mode!=='fast'){o.use_highways=0.0;o.use_primary=mode==='curvy'?0.1:0.3;o.use_living_streets=0.1}else{o.use_highways=1.0}return{motorcycle:o}}
 async function route(locs,mode,alts){const b={locations:locs.map(p=>({lat:p[0],lon:p[1],type:'break'})),costing:'motorcycle',costing_options:costing(mode),directions_options:{units:'miles'}};
  if(locs.length>2)b.locations.slice(1,-1).forEach(l=>l.type='through');if(alts)b.alternates=alts;const j=await post('/route',b);return [j.trip,...(j.alternates||[]).map(a=>a.trip)]}
-function tripInfo(t){let pts=[],man=[];for(const L of t.legs){pts=pts.concat(decode(L.shape));man=man.concat(L.maneuvers.filter((m,i)=>!(m.type===5||m.type===6)||i===L.maneuvers.length-1))}return{pts,man,miles:t.summary.length,min:t.summary.time/60}}
+function tripInfo(t){let pts=[],man=[];for(const L of t.legs){const off=pts.length;pts=pts.concat(decode(L.shape));man=man.concat(L.maneuvers.filter((m,i)=>!(m.type===5||m.type===6)||i===L.maneuvers.length-1).map(m=>({...m,idx:Math.min(off+m.begin_shape_index,pts.length-1)})))}return{pts,man,miles:t.summary.length,min:t.summary.time/60}}
 // Road class / surface breakdown via map-matching the geometry
 async function attrs(t){const shape=t.legs.map(l=>l.shape);const pts=t.legs.flatMap(l=>decode(l.shape));
  const enc=t.legs.length===1?shape[0]:null;const body={costing:'motorcycle',shape_match:'walk_or_snap',filters:{attributes:['edge.road_class','edge.surface','edge.unpaved','edge.length','edge.use'],action:'include'}};
@@ -79,5 +79,5 @@ async function plan(A,B,mode,log=()=>{}){
  for(const c of cands){for(let k=0;k<3&&!c.attrs;k++){try{c.attrs=await attrs(c.trip)}catch(e){await new Promise(r=>setTimeout(r,800*(k+1)))}}c.attrs=c.attrs||{tot:0,unpavedFrac:0,motorway:0,primary:0,sec:0,minor:0,err:1}}
  if(mode==='scenic'){try{const sc=await scenery(bboxOf(cands),log);cands.forEach(c=>c.nature=sceneryStats(c.pts,sc));cands.sceneSrc=sc.src||'cache'}catch(e){log('Scenery unavailable: '+e.message);cands.sceneErr=e.message}}
  cands.forEach(c=>c.score=score(c,c.attrs,mode,baseMin));cands.sort((a,b)=>b.score.total-a.score.total);return{best:cands[0],cands,sceneErr:cands.sceneErr}}
-G.Cycle={scenery,sceneryStats,bboxOf,decode,curvature,route,attrs,plan,tripInfo,VAL};if(typeof module!=='undefined')module.exports=G.Cycle;
+G.Cycle={dist,bearing,scenery,sceneryStats,bboxOf,decode,curvature,route,attrs,plan,tripInfo,VAL};if(typeof module!=='undefined')module.exports=G.Cycle;
 })(typeof window!=='undefined'?window:globalThis);

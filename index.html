@@ -16,9 +16,12 @@
   <small>Paved roads only · avoids interstates/motorways</small>
  </div>
  <button id="go">Route</button>
+ <button id="navbtn" hidden>▶ Start Navigation</button><button id="simbtn" hidden>Demo drive (simulate)</button>
  <div id="status"></div>
  <div id="summary"></div>
  <ol id="steps"></ol>
 </div>
+<div id="nav" hidden><div id="navtop"><div id="navicon">⬆</div><div><div id="navdist">–</div><div id="navinstr">Starting…</div><div id="navthen"></div></div></div>
+<div id="navbot"><div><b id="navrem">–</b><small>remaining</small></div><div><b id="naveta">–</b><small>ETA</small></div><div><b id="navspd">–</b><small>mph</small></div><button id="navmute">🔊</button><button id="navend">End</button></div><div id="navmsg"></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="routing.js"></script><script src="app.js"></script></body></html>
+<script src="routing.js"></script><script src="app.js"></script><script src="nav.js"></script></body></html>
